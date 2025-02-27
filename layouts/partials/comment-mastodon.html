@@ -1,0 +1,103 @@
+<div class="post-comment" data-comment="mastodon">
+  <span class="post-comment-notloaded">
+    <i class="iconfont icon-chatbox-ellipses-sharp"></i>&nbsp;{{ i18n "postComment" }}
+  </span>
+  <script>
+    /**
+     * Inserts statuses to comments in place
+     * Returns true if status was inserted, false otherwise 
+     */
+    function insert_comment(comments, status) {
+      let stack = [comments[0]];
+      while (stack) {
+        let curr = stack.pop(); // Order doesn't matter so we can pop from the end to save shifting items in the array
+        if (status.in_reply_to_id == curr.id) {
+          curr.replies.push({
+            ...status,
+            "replies": []
+          })
+          return true;
+        }
+        stack.push(...curr.replies);
+      }
+      return false;
+    }
+
+    /**
+     * Transforms flat list of descendants into a comment tree
+     */
+    function process_descendants(descendants) {
+      // Comments will be a layered hierarchy of statuses, which each status's parent having id equal to the status' in_reply_to_id
+      // Dummy root
+      const comments = [
+        {
+          "id": "{{ .Params.comments.mastodon.statusId }}",
+          "replies": []
+        }
+      ];
+
+      // Process descendants until the tree is constant
+      let stack = descendants;
+      while (true) {
+        let new_stack = [];
+        for (let i = 0; i < stack.length; i++) {
+          const status = stack[i];
+          if (insert_comment(comments, status)) {
+            continue;
+          } else {
+            // If no parent is found, its possible that the parent has not yet been added to the tree
+            // Process it again next loop
+            new_stack.push(status);
+          }
+        }
+        if (stack.length == new_stack.length) {
+          // No items have been moved to the comments, all remaining items are orphans
+          break;
+        }
+        stack = new_stack;
+      }
+
+      return comments[0].replies; // Don't return root
+    }
+
+    function render_comments(comments) {
+      return comments.map(comment => {
+        const rendered_comment = document.createElement('div');
+        let innerHTML = `
+          <p>
+            <a href="${comment.account.url}"><span>${comment.account.display_name}</span></a>
+            <a href="${comment.url}"><span>${comment.created_at}</span></a>
+          </p>
+          <div>${comment.content}<div>`;
+        if (comment.replies.length > 0) {
+          const rendered_children = render_comments(comment.replies);
+          innerHTML += `
+            <div style="display:flex">
+              <div style="padding:10px"></div>
+              <div>
+                ${rendered_children.map(child => child.outerHTML)}
+              </div>
+            </div>
+        `;
+        }
+        rendered_comment.innerHTML = innerHTML;
+        return rendered_comment;
+      });
+    }
+
+    async function loadComment() {
+      const mastodonStatusContextAPIEndpoint = `https://{{ .Params.comments.mastodon.instance }}/api/v1/statuses/{{ .Params.comments.mastodon.statusId }}/context/`
+      const resp = await fetch(mastodonStatusContextAPIEndpoint);
+      const data = await resp.json();
+
+      const comments = process_descendants(data.descendants); // Descendants is a flat list
+
+      var commentArea = document.querySelector('.post-comment');
+
+      const rendered_comments = render_comments(comments);
+      rendered_comments.forEach(comment => commentArea.appendChild(comment));
+
+      document.querySelector('span.post-comment-notloaded').setAttribute('style', 'display: none;');
+    }
+  </script>
+</div>
