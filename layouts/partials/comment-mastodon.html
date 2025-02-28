@@ -73,7 +73,8 @@
     }
 
     function render_comments(comments) {
-      const created_at = new Date(comments[0].created_at);
+      return comments.map(comment => {
+        const created_at = new Date(comment.created_at);
       const time_diff = (Date.now() - created_at.getTime()) / 1000;
       let time_diff_str;
       if (time_diff < 60) {
@@ -86,7 +87,6 @@
         time_diff_str = `${Math.floor(time_diff / 86400)} days ago`;
       }
 
-      return comments.map(comment => {
         const rendered_comment = document.createElement('div');
         rendered_comment.style.padding = '10px';
         let innerHTML = `
@@ -124,13 +124,24 @@
       commentArea.style.padding = '10px';
 
       data = await get_status(mastodonInstance, statusId);
+      const statusUrl = data.url;
       const replyButton = document.createElement('a');
-      replyButton.href = data.url;
+
+      replyButton.href = statusUrl;
       replyButton.innerHTML = `<button>Reply</button>`;
       commentArea.appendChild(replyButton);
 
       const rendered_comments = render_comments(comments);
-      rendered_comments.forEach(comment => commentArea.appendChild(comment));
+      if (rendered_comments.length === 0) {
+        commentArea.appendChild(document.createElement('p')).innerHTML = `
+        <div style="text-align: center">
+          <p>No comments yet...</p>
+          <p>Be the first to <a href=${statusUrl}>reply</a>!</p>
+        </div>
+      `;
+      } else {
+        rendered_comments.forEach(comment => commentArea.appendChild(comment));
+      }
 
       document.querySelector('span.post-comment-notloaded').setAttribute('style', 'display: none;');
     }
