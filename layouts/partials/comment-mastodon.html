@@ -73,15 +73,30 @@
     }
 
     function render_comments(comments) {
+      const created_at = new Date(comments[0].created_at);
+      const time_diff = (Date.now() - created_at.getTime()) / 1000;
+      let time_diff_str;
+      if (time_diff < 60) {
+        time_diff_str = `${Math.floor(time_diff)} seconds ago`;
+      } else if (time_diff < 3600) {
+        time_diff_str = `${Math.floor(time_diff / 60)} minutes ago`;
+      } else if (time_diff < 86400) {
+        time_diff_str = `${Math.floor(time_diff / 3600)} hours ago`;
+      } else {
+        time_diff_str = `${Math.floor(time_diff / 86400)} days ago`;
+      }
+
       return comments.map(comment => {
         const rendered_comment = document.createElement('div');
+        rendered_comment.style.padding = '10px';
         let innerHTML = `
           <p>
             <a href="${comment.account.url}"><span>${comment.account.display_name}</span></a>
-            <a href="${comment.url}"><span>${comment.created_at}</span></a>
-            <a href="${comment.url}"><span>Reply</span></a>
+            <a href="${comment.url}"><span>${time_diff_str}</span></a>
           </p>
-          <div>${comment.content}<div>`;
+          <div>${comment.content}<div>
+          <a href="${comment.url}"><span style="text-decoration: underline;font-size: 0.8em">Reply</span></a>
+        `;
         if (comment.replies.length > 0) {
           const rendered_children = render_comments(comment.replies);
           innerHTML += `
@@ -106,6 +121,7 @@
       const comments = process_descendants(data.descendants); // Descendants is a flat list
 
       let commentArea = document.querySelector('.post-comment');
+      commentArea.style.padding = '10px';
 
       data = await get_status(mastodonInstance, statusId);
       const replyButton = document.createElement('a');
